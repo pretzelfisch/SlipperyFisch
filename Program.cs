@@ -11,11 +11,14 @@ namespace SlipperyFisch
         static void Main ( string[] args )
         {
             var port = System.Configuration.ConfigurationManager.AppSettings["ListenPort"];
+            var SPA = System.Configuration.ConfigurationManager.AppSettings["SPAmode"];
             if ( string.IsNullOrWhiteSpace ( port ) )
                 port = "8888";
+            var SPAmode = false;
+            bool.TryParse(SPA, out SPAmode);
 
-            var serveMe = new SimpleHTTPServer("", int.Parse( port));
-            System.Console.WriteLine ( "Now listeing on port: " + port );
+            var serveMe = new SimpleHTTPServer("", int.Parse( port), SPAmode);
+            System.Console.WriteLine ( "Now listening on port: " + port );
             System.Console.ReadKey ();
             serveMe.Stop ();
             

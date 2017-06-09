@@ -11,7 +11,7 @@ using System.Diagnostics;
 namespace SlipperyFisch
 {
 
-   public  class SimpleHTTPServer
+    public class SimpleHTTPServer
     {
         private readonly string[] _indexFiles = {
         "index.html",
@@ -92,6 +92,7 @@ namespace SlipperyFisch
         private string _rootDirectory;
         private HttpListener _listener;
         private int _port;
+        private bool _isSPA;
 
         public int Port
         {
@@ -104,88 +105,89 @@ namespace SlipperyFisch
         /// </summary>
         /// <param name="path">Directory path to serve.</param>
         /// <param name="port">Port of the server.</param>
-        public SimpleHTTPServer ( string path, int port )
+        public SimpleHTTPServer(string path, int port, bool isSPA )
         {
-            this.Initialize ( path, port );
+            this.Initialize(path, port);
+            this._isSPA = isSPA;
         }
 
         /// <summary>
         /// Construct server with suitable port.
         /// </summary>
         /// <param name="path">Directory path to serve.</param>
-        public SimpleHTTPServer ( string path )
+        public SimpleHTTPServer(string path)
         {
             //get an empty port
             TcpListener l = new TcpListener(IPAddress.Loopback, 0);
-            l.Start ();
+            l.Start();
             int port = ((IPEndPoint)l.LocalEndpoint).Port;
-            l.Stop ();
-            this.Initialize ( path, port );
+            l.Stop();
+            this.Initialize(path, port);
         }
 
         /// <summary>
         /// Stop server and dispose all functions.
         /// </summary>
-        public void Stop ()
+        public void Stop()
         {
-            _serverThread.Abort ();
-            _listener.Stop ();
+            _serverThread.Abort();
+            _listener.Stop();
         }
 
-        private  void  Listen ()
+        private void Listen()
         {
-            _listener = new HttpListener ();
-            _listener.Prefixes.Add ( "http://*:" + _port.ToString () + "/" );
-            _listener.Start ();
-            while ( true )
+            _listener = new HttpListener();
+            _listener.Prefixes.Add("http://*:" + _port.ToString() + "/");
+            _listener.Start();
+            while (true)
             {
                 try
                 {
                     HttpListenerContext context = _listener.GetContext();
                     string rawRequest = string.Empty;
-                    
+
                     System.Collections.Specialized.NameValueCollection headers = context.Request.Headers;
                     // Get each header and display each value.
-                    foreach ( string key in headers.AllKeys )
+                    foreach (string key in headers.AllKeys)
                     {
                         string[] values = headers.GetValues(key);
-                        if ( values.Length > 0 )
+                        if (values.Length > 0)
                         {
-                            foreach ( string value in values )
+                            foreach (string value in values)
                             {
-                                rawRequest += System.Environment.NewLine + string.Format ( "{0}:{1}",key, value );
+                                rawRequest += System.Environment.NewLine + string.Format("{0}:{1}", key, value);
                             }
                         }
                     }
 
-                    using ( System.IO.Stream body = context.Request.InputStream ) // here we have data
+                    using (System.IO.Stream body = context.Request.InputStream) // here we have data
                     {
-                        using ( System.IO.StreamReader reader = new System.IO.StreamReader ( body, context.Request.ContentEncoding ) )
+                        using (System.IO.StreamReader reader = new System.IO.StreamReader(body, context.Request.ContentEncoding))
                         {
-                            rawRequest += System.Environment.NewLine + reader.ReadToEnd ();
+                            rawRequest += System.Environment.NewLine + reader.ReadToEnd();
                         }
                     }
-                    System.IO.File.WriteAllText ( @"C:\Users\aaron_fischer\Desktop\talxActual.txt", rawRequest );
-                    Process ( context );
+                    System.IO.File.WriteAllText(@"log.txt", rawRequest);
+                    Process(context);
                 }
-                catch ( Exception ex )
+                catch (Exception ex)
                 {
-
+                    System.IO.File.AppendAllText(@"error.txt", ex.ToString());
                 }
             }
         }
 
-        private void Process ( HttpListenerContext context )
+        private void Process(HttpListenerContext context)
         {
             string filename = context.Request.Url.AbsolutePath;
-            Console.WriteLine ( filename );
-            filename = filename.Substring ( 1 );
+            Console.WriteLine(filename);
+            filename = filename.Substring(1);
 
-            if ( string.IsNullOrEmpty ( filename ) )
+            if (string.IsNullOrEmpty(filename)||( this._isSPA && filename.Contains(".") == false) )
             {
-                foreach ( string indexFile in _indexFiles )
+                foreach (string indexFile in _indexFiles)
                 {
-                    if ( File.Exists ( Path.Combine ( _rootDirectory, indexFile ) ) )
+                    if (File.Exists(Path.Combine(_rootDirectory, indexFile)))
                     {
                         filename = indexFile;
                         break;
@@ -193,9 +195,9 @@ namespace SlipperyFisch
                 }
             }
 
-            filename = Path.Combine ( _rootDirectory, filename );
+            filename = Path.Combine(_rootDirectory, filename);
 
-            if ( File.Exists ( filename ) )
+            if (File.Exists(filename))
             {
                 try
                 {
@@ -203,40 +205,73 @@ namespace SlipperyFisch
 
                     //Adding permanent http response headers
                     string mime;
-                    context.Response.ContentType = _mimeTypeMappings.TryGetValue ( Path.GetExtension ( filename ), out mime ) ? mime : "application/octet-stream";
+                    context.Response.ContentType = _mimeTypeMappings.TryGetValue(Path.GetExtension(filename), out mime) ? mime : "application/octet-stream";
                     context.Response.ContentLength64 = input.Length;
-                    context.Response.AddHeader ( "Date", DateTime.Now.ToString ( "r" ) );
-                    context.Response.AddHeader ( "Last-Modified", System.IO.File.GetLastWriteTime ( filename ).ToString ( "r" ) );
+                    context.Response.AddHeader("Date", DateTime.Now.ToString("r"));
+                    context.Response.AddHeader("Last-Modified", System.IO.File.GetLastWriteTime(filename).ToString("r"));
 
                     byte[] buffer = new byte[1024 * 16];
                     int nbytes;
-                    while ( ( nbytes = input.Read ( buffer, 0, buffer.Length ) ) > 0 )
-                        context.Response.OutputStream.Write ( buffer, 0, nbytes );
-                    input.Close ();
+                    while ((nbytes = input.Read(buffer, 0, buffer.Length)) > 0)
+                        context.Response.OutputStream.Write(buffer, 0, nbytes);
+                    input.Close();
 
                     context.Response.StatusCode = (int)HttpStatusCode.OK;
-                    context.Response.OutputStream.Flush ();
+                    context.Response.OutputStream.Flush();
                 }
-                catch ( Exception ex )
+                catch (Exception ex)
                 {
-                    context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+                    System.IO.File.AppendAllText(@"error.txt", ex.ToString());
+                    WriteResponse(context.Response, (int)HttpStatusCode.InternalServerError);
                 }
-
             }
             else
             {
-                context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                WriteResponse(context.Response, (int)HttpStatusCode.NotFound);
             }
-
-            context.Response.OutputStream.Close ();
+            context.Response.OutputStream.Close();
         }
 
-        private void Initialize ( string path, int port )
+        private void Initialize(string path, int port)
         {
             this._rootDirectory = path;
             this._port = port;
-            _serverThread = new Thread ( this.Listen );
-            _serverThread.Start ();
+            _serverThread = new Thread(this.Listen);
+            _serverThread.Start();
+        }
+
+        void WriteResponse(HttpListenerResponse response, int statusCode)
+        {
+            var outputStream = response.OutputStream;
+
+            response.ContentType = "text/html";
+            response.StatusCode = statusCode;
+            response.AddHeader("Date", DateTime.Now.ToString("r"));
+
+            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+
+            var resourceName = $"SlipperyFisch.content.page{statusCode}.html";
+
+            using (Stream stream = assembly.GetManifestResourceStream(resourceName))
+            {
+                response.ContentLength64 = stream.Length;
+                int byteData = 0;
+                while (true)
+                {
+                    byteData = stream.ReadByte();
+                    if (byteData >= 0)
+                    {
+                        outputStream.WriteByte((byte)byteData);
+                    }
+                    else
+                    {
+                        outputStream.Flush();
+                        break;
+                    }
+                }
+            }
+
+
         }
 
 
