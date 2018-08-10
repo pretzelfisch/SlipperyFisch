@@ -19,7 +19,7 @@ namespace SlipperyFisch
         "default.html",
         "default.htm"
     };
-
+        private readonly ILogging _logger;
         private static IDictionary<string, string> _mimeTypeMappings = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase) {
         #region extension to MIME type list
         {".asf", "video/x-ms-asf"},
@@ -100,34 +100,21 @@ namespace SlipperyFisch
             private set { }
         }
 
-        /// <summary>
-        /// Construct server with given port.
-        /// </summary>
-        /// <param name="path">Directory path to serve.</param>
-        /// <param name="port">Port of the server.</param>
-        public SimpleHTTPServer(string path, int port, bool isSPA )
+        public SimpleHTTPServer(ServerConfiguration configuration )
         {
-            this.Initialize(path, port);
-            this._isSPA = isSPA;
+            this._logger = configuration.Logger;
+            this._isSPA = configuration.isSPA;
+            if (!configuration.Port.HasValue)
+            {
+                //get an empty port
+                TcpListener l = new TcpListener(IPAddress.Loopback, 0);
+                l.Start();
+                configuration.Port = ((IPEndPoint)l.LocalEndpoint).Port;
+                l.Stop();
+            }
+            this.Initialize(configuration.VirtualDirectory, configuration.Port.Value);
         }
 
-        /// <summary>
-        /// Construct server with suitable port.
-        /// </summary>
-        /// <param name="path">Directory path to serve.</param>
-        public SimpleHTTPServer(string path)
-        {
-            //get an empty port
-            TcpListener l = new TcpListener(IPAddress.Loopback, 0);
-            l.Start();
-            int port = ((IPEndPoint)l.LocalEndpoint).Port;
-            l.Stop();
-            this.Initialize(path, port);
-        }
-
-        /// <summary>
-        /// Stop server and dispose all functions.
-        /// </summary>
         public void Stop()
         {
             _serverThread.Abort();
@@ -167,12 +154,12 @@ namespace SlipperyFisch
                             rawRequest += System.Environment.NewLine + reader.ReadToEnd();
                         }
                     }
-                    System.IO.File.WriteAllText(@"log.txt", rawRequest);
+                    _logger.Info(new LogMessage(nameof(Listen), $"{context.Request.HttpMethod}: {context.Request.Url.ToString()}", rawRequest));
                     Process(context);
                 }
                 catch (Exception ex)
                 {
-                    System.IO.File.AppendAllText(@"error.txt", ex.ToString());
+                    _logger.Error(new LogMessage(nameof(Listen), "UnHandledError",  ex));
                 }
             }
         }
@@ -221,7 +208,7 @@ namespace SlipperyFisch
                 }
                 catch (Exception ex)
                 {
-                    System.IO.File.AppendAllText(@"error.txt", ex.ToString());
+                    _logger.Error(new LogMessage(nameof(Process), "UnHandledError", ex));
                     WriteResponse(context.Response, (int)HttpStatusCode.InternalServerError);
                 }
             }

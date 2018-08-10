@@ -8,20 +8,25 @@ namespace SlipperyFisch
 {
     class Program
     {
+       
         static void Main ( string[] args )
         {
-            var port = System.Configuration.ConfigurationManager.AppSettings["ListenPort"];
-            var SPA = System.Configuration.ConfigurationManager.AppSettings["SPAmode"];
-            if ( string.IsNullOrWhiteSpace ( port ) )
-                port = "8888";
-            var SPAmode = false;
-            bool.TryParse(SPA, out SPAmode);
+            var config = GetConfigurationSettins();
 
-            var serveMe = new SimpleHTTPServer("", int.Parse( port), SPAmode);
-            System.Console.WriteLine ( "Now listening on port: " + port );
+            var serveMe = new SimpleHTTPServer(config);
+            System.Console.WriteLine ( "Now listening on port: " + config.Port.ToString() );
             System.Console.ReadKey ();
             serveMe.Stop ();
-            
         }
+        static ServerConfiguration GetConfigurationSettins() {
+
+            var virtualDirectoryPath = System.Configuration.ConfigurationManager.AppSettings["VirtualDirectory"];
+            var port = System.Configuration.ConfigurationManager.AppSettings["ListenPort"];
+            var SPA = System.Configuration.ConfigurationManager.AppSettings["SPAmode"];
+            //TODO: read logging directory
+
+            return new ServerConfiguration(virtualDirectoryPath, port, SPA, new SimpleLogger( System.Environment.CurrentDirectory));
+        }
+
     }
 }
