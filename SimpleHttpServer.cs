@@ -76,6 +76,7 @@ namespace SlipperyFisch
         {".sea", "application/x-sea"},
         {".shtml", "text/html"},
         {".sit", "application/x-stuffit"},
+        {".svg", "image/svg+xml"},
         {".swf", "application/x-shockwave-flash"},
         {".tcl", "application/x-tcl"},
         {".tk", "application/x-tcl"},
