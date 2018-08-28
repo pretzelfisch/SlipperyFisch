@@ -169,7 +169,7 @@ namespace SlipperyFisch
         {
             string filename = context.Request.Url.AbsolutePath;
             Console.WriteLine(filename);
-            filename = filename.Substring(1);
+            filename = Uri.UnescapeDataString(filename.Substring(1) );
 
             if (string.IsNullOrEmpty(filename)||( this._isSPA && filename.Contains(".") == false) )
             {
